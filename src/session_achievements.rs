@@ -1,20 +1,20 @@
-use crate::api::i_steam_user_stats::{PlayerAchievementsResponse, PlayerStats};
-use chrono_tz::Tz;
+use crate::{
+    Config,
+    api::i_steam_user_stats::{PlayerAchievementsResponse, PlayerStats},
+};
 
 /// Fetch achievements for the current game
 pub async fn get_session_achievement(
-    api_key: String,
-    steamid: String,
-    appid: String,
-    game_name: String,
+    config: Config<'_>,
+    appid: &str,
+    game_name: &str,
     start_time: i64,
     end_time: i64,
-    timezone: &Tz,
 ) -> Result<String, Box<dyn std::error::Error>> {
     // println!("game id: {appid}");
     let achievements_url = format!(
         "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid={}&key={}&steamid={}&l=english",
-        appid, api_key, steamid
+        appid, config.api_key, config.steam_id
     );
 
     let achievements_response = reqwest::get(&achievements_url).await?;
@@ -24,8 +24,8 @@ pub async fn get_session_achievement(
             println!("No achievements available for this game");
             PlayerAchievementsResponse {
                 playerstats: PlayerStats {
-                    steamID: steamid.clone(),
-                    gameName: game_name.clone(),
+                    steamID: config.steam_id.to_string(),
+                    gameName: game_name.to_string(),
                     achievements: vec![],
                 },
             }
@@ -38,7 +38,6 @@ pub async fn get_session_achievement(
         .achievements
         .iter()
         .filter(|a| a.achieved == 1)
-        // TODO: filter only those between the game time
         .filter(|a| a.unlocktime >= start_time && a.unlocktime <= end_time)
         .map(|a| {
             format!(
@@ -49,10 +48,10 @@ pub async fn get_session_achievement(
                     .unwrap_or(&"no description".to_string()),
                 chrono::DateTime::from_timestamp(a.unlocktime, 0)
                     .map(|dt| dt
-                        .with_timezone(timezone)
+                        .with_timezone(config.timezone)
                         .format("%Y-%m-%d %H:%M:%S")
                         .to_string())
-                    .unwrap_or_default()
+                    .unwrap_or_default(),
             )
         })
         .collect::<Vec<_>>()

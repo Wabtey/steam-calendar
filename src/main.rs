@@ -1,93 +1,108 @@
-use chrono::{Duration, Utc};
-use chrono_tz::Europe;
+use calendar::create_game_session_event;
+use chrono::{DateTime, Duration, Utc};
+use chrono_tz::{Europe, Tz};
 use dotenv::dotenv;
-use icalendar::{Calendar, Component, Event, EventLike};
-use session_achievements::get_session_achievement;
-use std::{env, fs, path::Path, str::FromStr};
+use std::env;
 
 use api::i_player_service::PlayerSummaryResponse;
 
 mod api;
+mod calendar;
 mod session_achievements;
+
+#[derive(Clone, Copy, Debug)]
+pub struct Config<'a> {
+    pub api_key: &'a str,
+    pub steam_id: &'a str,
+    pub timezone: &'a Tz,
+    pub calendar_path: &'a str,
+}
+
+// REFACTOR: write logs down
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
-    let api_key = env::var("STEAM_API_KEY")
+    let api_key = &env::var("STEAM_API_KEY")
         .expect("STEAM_API_KEY must be set in environment variables (`/.env`)");
-    let user_id = env::var("STEAM_USER_ID")
+    let steam_id = &env::var("STEAM_USER_ID")
         .expect("STEAM_USER_ID must be set in environment variables (`/.env`)");
+    let calendar_path = "game_sessions.ics";
+    // TODO: feat - ask for/detect timezone
+    let timezone = &Europe::Paris;
+    // TODO: ask delay frequency
+    let delay: u64 = 5 * 60;
 
-    /* ------------------------------- API request ------------------------------ */
-    // TODO: feat - request every 5minutes
-    let url = format!(
-        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={api_key}&steamids={user_id}",
+    let config = Config {
+        api_key,
+        steam_id,
+        timezone,
+        calendar_path,
+    };
+
+    let player_summaries_url = format!(
+        "https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key={}&steamids={}",
+        config.api_key, config.steam_id
     );
+    // TOTEST: switching while being on between two games
+    let mut currently_playing: Option<String> = None;
+    let mut game_id = String::new();
+    let mut start_time: DateTime<Utc> = Utc::now();
+    let mut end_time: DateTime<Utc>;
 
-    let response = reqwest::get(&url).await?;
-    let player_summary: PlayerSummaryResponse = response.json().await?;
-    println!("{:?}", player_summary.response.players[0].gameextrainfo);
+    let mut watching = true;
+    while watching {
+        watching = true;
+        /* ------------------------------- API request ------------------------------ */
+        let response = reqwest::get(&player_summaries_url).await?;
+        let player_summary: PlayerSummaryResponse = response.json().await?;
+        let game_currently_played = &player_summary.response.players[0].gameextrainfo;
 
-    if let Some(game_info) = &player_summary.response.players[0].gameextrainfo {
-        // REFACTOR: create event after the session ended
-        /* -------------------------- retrieve achievements ------------------------- */
-        let game_id = player_summary.response.players[0]
-            .gameid
-            .as_ref()
-            .expect("No game ID found");
-        let achievements = get_session_achievement(
-            api_key,
-            user_id,
-            game_id.to_string(),
-            game_info.to_string(),
-            (Utc::now() - Duration::days(359)).timestamp(),
-            Utc::now().timestamp(),
-            &Europe::Paris,
-        )
-        .await?;
+        let start_of_session = currently_playing.is_none() && game_currently_played.is_some();
+        let end_of_session = currently_playing.is_some() && game_currently_played.is_none();
 
-        /* ---------------------------- retrieve calendar --------------------------- */
-        let calendar_path = "game_sessions.ics";
-        let mut calendar = if Path::new(calendar_path).exists() {
-            let calendar_data = fs::read_to_string(calendar_path)?;
-            Calendar::from_str(&calendar_data)?
-        } else {
-            Calendar::new()
-                .name("Game Sessions")
-                // .version("2.0")
-                .done()
-        };
-        // TODO: feat - send event to provider
-        // TODO: feat - ask one time for user credentials to connect to CalDAV
-        // TODO: feat - ask for/detect timezone
+        if start_of_session {
+            start_time = Utc::now();
+            currently_playing = game_currently_played.clone();
+            game_id = player_summary.response.players[0]
+                .gameid
+                .as_ref()
+                .expect("No game ID found")
+                .to_string();
+            println!(
+                "{}: Started playing at {}",
+                Utc::now().with_timezone(timezone).format("%H:%M:%S"),
+                currently_playing.as_ref().unwrap()
+            );
+        }
 
-        /* ----------------------------- push new event ----------------------------- */
-        // TODO: feat - add presence of steam friend
-        let description = if achievements.is_empty() {
-            "No achievements unlocked during this session".to_string()
-        } else {
-            format!("Achievements:\n{achievements}")
-        };
+        if !end_of_session {
+            wait_x_seconds(timezone, delay).await;
+            continue;
+        }
 
-        let event = Event::new()
-            .summary(game_info)
-            .description(&description)
-            .starts(Utc::now())
-            // .class(Class::Confidential)
-            .ends(Utc::now() + Duration::minutes(20))
-            .uid(&format!(
-                "steam-{}-{}",
-                game_info.to_lowercase().replace(" ", "-"),
-                Utc::now().timestamp()
-            ))
-            .done();
+        end_time = Utc::now();
+        /* -------------------------------------------------------------------------- */
+        /*                 Create the Event at the end of the session                 */
+        /* -------------------------------------------------------------------------- */
+        let game_info = currently_playing.clone().unwrap();
+        let _calendar =
+            create_game_session_event(config, &game_id, &game_info, start_time, end_time).await?;
+        // publish_game_session_calendar();
 
-        // println!("{event:#?}");
-        calendar.push(event);
+        currently_playing = None; // = game_currently_played.clone();
 
-        fs::write(calendar_path, calendar.to_string())?;
-        println!("{calendar}");
+        wait_x_seconds(timezone, delay).await;
     }
 
     Ok(())
+}
+
+async fn wait_x_seconds(timezone: &Tz, delay: u64) {
+    let next_update = Utc::now() + Duration::seconds(delay as i64);
+    println!(
+        "Next update: {}",
+        next_update.with_timezone(timezone).format("%H:%M:%S")
+    );
+    tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
 }
