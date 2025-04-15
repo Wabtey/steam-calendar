@@ -1,5 +1,8 @@
 # Add your (steam) game sessions to your calendar
 
+<!-- DOC: License it -->
+<!-- DOC: Code coverage -->
+
 ## Quickstart
 
 - create the `.env` file at the root of the project and include your [steam api key](https://steamcommunity.com/dev/apikey)

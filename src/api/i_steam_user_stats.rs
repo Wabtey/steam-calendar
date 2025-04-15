@@ -5,10 +5,11 @@ pub struct PlayerAchievementsResponse {
     pub playerstats: PlayerStats,
 }
 
+#[allow(non_snake_case)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PlayerStats {
-    pub steamid: String,
-    pub gamename: String,
+    pub steamID: String,
+    pub gameName: String,
     pub achievements: Vec<Achievement>,
 }
 

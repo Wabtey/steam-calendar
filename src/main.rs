@@ -1,11 +1,13 @@
 use chrono::{Duration, Utc};
 use dotenv::dotenv;
-use icalendar::{Calendar, Class, Component, Event, EventLike};
+use icalendar::{Calendar, Component, Event, EventLike};
+use session_achievements::get_session_achievement;
 use std::{env, fs, path::Path, str::FromStr};
 
 use api::i_player_service::PlayerSummaryResponse;
 
 mod api;
+mod session_achievements;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,7 +28,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", player_summary.response.players[0].gameextrainfo);
 
     if let Some(game_info) = &player_summary.response.players[0].gameextrainfo {
-        // TODO: feat - fetch the achievements obtained
+        /* -------------------------- retrieve achievements ------------------------- */
+        let game_id = player_summary.response.players[0]
+            .gameid
+            .as_ref()
+            .expect("No game ID found");
+        let achievements =
+            get_session_achievement(api_key, user_id, game_id.to_string(), game_info.to_string())
+                .await?;
+
         /* ---------------------------- retrieve calendar --------------------------- */
         let calendar_path = "game_sessions.ics";
         let mut calendar = if Path::new(calendar_path).exists() {
@@ -42,11 +52,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // TODO: feat - ask one time for user credentials to connect to CalDAV
 
         /* ----------------------------- push new event ----------------------------- */
+        // TODO: feat - add presence of steam friend
+        let description = if achievements.is_empty() {
+            "No achievements unlocked during this session".to_string()
+        } else {
+            format!("Achievements:\n{achievements}")
+        };
+
         let event = Event::new()
             .summary(game_info)
-            .description("Achievements:\n- 1% Finish the base game")
+            .description(&description)
             .starts(Utc::now())
-            .class(Class::Confidential)
+            // .class(Class::Confidential)
             .ends(Utc::now() + Duration::minutes(20))
             .uid(&format!(
                 "steam-{}-{}",
