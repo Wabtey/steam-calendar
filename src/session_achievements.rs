@@ -1,4 +1,5 @@
 use crate::api::i_steam_user_stats::{PlayerAchievementsResponse, PlayerStats};
+use chrono_tz::Tz;
 
 /// Fetch achievements for the current game
 pub async fn get_session_achievement(
@@ -6,10 +7,13 @@ pub async fn get_session_achievement(
     steamid: String,
     appid: String,
     game_name: String,
+    start_time: i64,
+    end_time: i64,
+    timezone: &Tz,
 ) -> Result<String, Box<dyn std::error::Error>> {
-    println!("{appid}");
+    // println!("game id: {appid}");
     let achievements_url = format!(
-        "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid={}&key={}&steamid={}",
+        "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid={}&key={}&steamid={}&l=english",
         appid, api_key, steamid
     );
 
@@ -35,17 +39,19 @@ pub async fn get_session_achievement(
         .iter()
         .filter(|a| a.achieved == 1)
         // TODO: filter only those between the game time
+        .filter(|a| a.unlocktime >= start_time && a.unlocktime <= end_time)
         .map(|a| {
             format!(
-                "- {} ({})",
-                // REFACTOR: instead of using localized name/description fetch game info to complete
+                "- {}: {} ({})",
                 a.name.as_ref().unwrap_or(&a.apiname),
-                // a.description
-                //     .as_ref()
-                //     .unwrap_or(&"no description".to_string()),
-                // FIXME: use custom timezone (summer hour, time late by an hour)
+                a.description
+                    .as_ref()
+                    .unwrap_or(&"no description".to_string()),
                 chrono::DateTime::from_timestamp(a.unlocktime, 0)
-                    .map(|dt| dt.format("%Y-%m-%d %H:%M:%S").to_string())
+                    .map(|dt| dt
+                        .with_timezone(timezone)
+                        .format("%Y-%m-%d %H:%M:%S")
+                        .to_string())
                     .unwrap_or_default()
             )
         })

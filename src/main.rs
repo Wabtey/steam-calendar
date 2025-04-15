@@ -1,4 +1,5 @@
 use chrono::{Duration, Utc};
+use chrono_tz::Europe;
 use dotenv::dotenv;
 use icalendar::{Calendar, Component, Event, EventLike};
 use session_achievements::get_session_achievement;
@@ -28,14 +29,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{:?}", player_summary.response.players[0].gameextrainfo);
 
     if let Some(game_info) = &player_summary.response.players[0].gameextrainfo {
+        // REFACTOR: create event after the session ended
         /* -------------------------- retrieve achievements ------------------------- */
         let game_id = player_summary.response.players[0]
             .gameid
             .as_ref()
             .expect("No game ID found");
-        let achievements =
-            get_session_achievement(api_key, user_id, game_id.to_string(), game_info.to_string())
-                .await?;
+        let achievements = get_session_achievement(
+            api_key,
+            user_id,
+            game_id.to_string(),
+            game_info.to_string(),
+            (Utc::now() - Duration::days(359)).timestamp(),
+            Utc::now().timestamp(),
+            &Europe::Paris,
+        )
+        .await?;
 
         /* ---------------------------- retrieve calendar --------------------------- */
         let calendar_path = "game_sessions.ics";
@@ -50,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
         // TODO: feat - send event to provider
         // TODO: feat - ask one time for user credentials to connect to CalDAV
+        // TODO: feat - ask for/detect timezone
 
         /* ----------------------------- push new event ----------------------------- */
         // TODO: feat - add presence of steam friend
