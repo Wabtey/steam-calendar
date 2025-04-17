@@ -4,12 +4,7 @@ use chrono::{DateTime, Duration, Utc};
 use chrono_tz::{Europe, Tz};
 use dotenv::dotenv;
 use icalendar::Calendar;
-use std::{
-    env, fs,
-    path::Path,
-    str::FromStr,
-    sync::{Arc, RwLock},
-};
+use std::{env, fs, path::Path, str::FromStr, sync::Arc};
 
 use api::i_player_service::PlayerSummaryResponse;
 
@@ -40,7 +35,6 @@ pub struct CalDAV {
 }
 
 struct AppState {
-    calendar: RwLock<icalendar::Calendar>,
     config: Config,
 }
 
@@ -52,7 +46,18 @@ struct AppState {
 
 #[get("/calendar.ics")]
 async fn ics_endpoint(data: web::Data<Arc<AppState>>) -> impl Responder {
-    let calendar = data.calendar.read().unwrap();
+    let config = &data.config;
+
+    let blank_calendar = Calendar::new()
+        .name("Game Sessions")
+        // .version("2.0")
+        .done();
+    let calendar = if Path::new(&config.calendar_path).exists() {
+        let calendar_data = fs::read_to_string(config.calendar_path.clone()).unwrap_or_default();
+        Calendar::from_str(&calendar_data).unwrap_or(blank_calendar)
+    } else {
+        blank_calendar
+    };
     let ics_content = calendar.to_string();
 
     HttpResponse::Ok()
@@ -173,20 +178,7 @@ async fn main() -> std::io::Result<()> {
         },
     };
 
-    let calendar = if Path::new(&config.calendar_path).exists() {
-        let calendar_data = fs::read_to_string(config.calendar_path.clone())?;
-        Calendar::from_str(&calendar_data)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-    } else {
-        Calendar::new()
-            .name("Game Sessions")
-            // .version("2.0")
-            .done()
-    };
-    let app_state = Arc::new(AppState {
-        calendar: RwLock::new(calendar),
-        config,
-    });
+    let app_state = Arc::new(AppState { config });
 
     /* ---------------------------------------------------------- */
     // println!("steam-gunfire-reborn-{}", Utc::now().timestamp());
