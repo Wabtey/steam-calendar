@@ -7,7 +7,7 @@ use crate::{Config, session_achievements::get_session_achievement};
 
 /// Append to the calendar the game session event.
 pub async fn create_game_session_event(
-    config: Config<'_>,
+    config: Config,
     game_id: &str,
     game_info: &str,
     start_time: DateTime<Utc>,
@@ -25,7 +25,9 @@ pub async fn create_game_session_event(
 
     println!(
         "{}: Stopped playing at {}{} (for {})",
-        Utc::now().with_timezone(config.timezone).format("%H:%M:%S"),
+        Utc::now()
+            .with_timezone(&config.timezone)
+            .format("%H:%M:%S"),
         game_info,
         if achievements.is_empty() {
             "".to_string()
@@ -48,8 +50,8 @@ pub async fn create_game_session_event(
         }
     );
     /* ---------------------------- retrieve calendar --------------------------- */
-    let mut calendar = if Path::new(config.calendar_path).exists() {
-        let calendar_data = fs::read_to_string(config.calendar_path)?;
+    let mut calendar = if Path::new(&config.calendar_path).exists() {
+        let calendar_data = fs::read_to_string(config.calendar_path.clone())?;
         Calendar::from_str(&calendar_data)?
     } else {
         Calendar::new()

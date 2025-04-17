@@ -5,7 +5,7 @@ use crate::{
 
 /// Fetch achievements for the current game
 pub async fn get_session_achievement(
-    config: Config<'_>,
+    config: Config,
     appid: &str,
     game_name: &str,
     start_time: i64,
@@ -48,7 +48,7 @@ pub async fn get_session_achievement(
                     .unwrap_or(&"no description".to_string()),
                 chrono::DateTime::from_timestamp(a.unlocktime, 0)
                     .map(|dt| dt
-                        .with_timezone(config.timezone)
+                        .with_timezone(&config.timezone)
                         .format("%Y-%m-%d %H:%M:%S")
                         .to_string())
                     .unwrap_or_default(),

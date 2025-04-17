@@ -16,7 +16,9 @@
   CALDAV_PASSWORD="password"
   ```
 
-- `cargo run`
+- `cargo run` locally run your server and query steam api
+- `ngrok http http://localhost:8080` to publish your local server using ngrok
+- append `/calendar.ics` to your ngrok url and use it do have a dynamic (change with the server) read only calendar
 
 ## Event Format
 
