@@ -6,11 +6,14 @@
 ## Quickstart
 
 - create the `.env` file at the root of the project and include your [steam api key](https://steamcommunity.com/dev/apikey)
-  - `cp .sos.env .env`
+  - `cp .example.env .env`
   
   ```toml
   STEAM_API_KEY=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
   STEAM_USER_ID=76561197960435530 # Robin Walker
+  CALDAV_PROVIDER="https://myNextCloudserver.org/remote.php/dav/calendars/user"
+  CALDAV_USERNAME=User
+  CALDAV_PASSWORD="password"
   ```
 
 - `cargo run`
@@ -30,3 +33,5 @@ UID:steam-vampire-survivors-1744676949
 END:VEVENT
 END:VCALENDAR
 ```
+
+<!-- DOC: add to the repo an example of .ics generated -->

@@ -1,7 +1,7 @@
-use std::{fs, path::Path, str::FromStr};
-
 use chrono::{DateTime, Duration, Utc};
 use icalendar::{Calendar, Component, Event, EventLike};
+use reqwest::{Client, header};
+use std::{error::Error, fs, path::Path, str::FromStr};
 
 use crate::{Config, session_achievements::get_session_achievement};
 
@@ -12,10 +12,10 @@ pub async fn create_game_session_event(
     game_info: &str,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
-) -> Result<Calendar, Box<dyn std::error::Error>> {
+) -> Result<Event, Box<dyn Error>> {
     /* -------------------------- retrieve achievements ------------------------- */
     let achievements = get_session_achievement(
-        config,
+        config.clone(),
         game_id,
         game_info,
         start_time.timestamp(),
@@ -57,8 +57,6 @@ pub async fn create_game_session_event(
             // .version("2.0")
             .done()
     };
-    // TODO: feat - send event to provider
-    // TODO: feat - ask one time for user credentials to connect to CalDAV
 
     /* ----------------------------- push new event ----------------------------- */
     // TODO: feat - add presence of steam friend
@@ -82,9 +80,46 @@ pub async fn create_game_session_event(
         .done();
 
     // println!("{event:#?}");
-    calendar.push(event);
+    // local save
+    calendar.push(event.clone());
 
     fs::write(config.calendar_path, calendar.to_string())?;
     // println!("{calendar}");
-    Ok(calendar)
+    Ok(event)
+}
+
+/* ---------------------------------------------------------- */
+/*                           CalDAV                           */
+/* ---------------------------------------------------------- */
+
+#[allow(unused)]
+pub async fn publish_to_nextcloud(
+    event: &Event,
+    provider: &str,
+    username: &str,
+    password: &str,
+) -> Result<(), Box<dyn Error>> {
+    let uid = event.get_uid().ok_or("Event has no UID")?;
+    let ical_data = event.to_string();
+    let url = format!("{}/{}.ics", provider, uid);
+
+    let client = Client::new();
+    let response = client
+        .put(&url)
+        .basic_auth(username, Some(password))
+        .header(header::CONTENT_TYPE, "text/calendar; charset=utf-8")
+        .body(ical_data)
+        .send()
+        .await?;
+
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Failed to upload event: {} {}",
+            response.status(),
+            response.text().await?
+        )
+        .into())
+    }
 }
