@@ -1,4 +1,4 @@
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use icalendar::{Calendar, Component, Event, EventLike};
 use reqwest::{Client, header};
 use std::{error::Error, fs, path::Path, str::FromStr};
@@ -71,13 +71,14 @@ pub async fn create_game_session_event(
     let event = Event::new()
         .summary(game_info)
         .description(&description)
-        .starts(Utc::now())
+        .starts(start_time)
         // .class(Class::Confidential)
-        .ends(Utc::now() + Duration::minutes(20))
+        .status(icalendar::EventStatus::Confirmed)
+        .ends(end_time)
         .uid(&format!(
             "steam-{}-{}",
             game_info.to_lowercase().replace(" ", "-"),
-            Utc::now().timestamp()
+            start_time.timestamp()
         ))
         .done();
 
