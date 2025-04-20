@@ -32,7 +32,7 @@ pub async fn create_game_session_event(
         if achievements.is_empty() {
             "".to_string()
         } else {
-            format!(", {} achievements unlocked", achievements.len())
+            format!(", {} achievements unlocked", achievements.lines().count())
         },
         {
             let duration = end_time - start_time;
