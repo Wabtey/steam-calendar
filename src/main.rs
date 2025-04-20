@@ -80,7 +80,7 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
     let mut currently_playing: Option<String> = None;
     let mut game_id = String::new();
     let mut start_time: DateTime<Utc> = Utc::now();
-    // let mut end_time: DateTime<Utc>;
+    let mut skip_waiting = false;
 
     loop {
         match reqwest::get(&player_summaries_url).await {
@@ -91,8 +91,16 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
 
                     let start_of_session =
                         currently_playing.is_none() && game_currently_played.is_some();
-                    let end_of_session =
-                        currently_playing.is_some() && game_currently_played.is_none();
+                    let end_of_session = currently_playing.is_some()
+                        && (game_currently_played.is_none() || {
+                            let past_game = currently_playing.clone().unwrap();
+                            let current_game = game_currently_played.unwrap().as_ref();
+                            // println!("past: {past_game}, current: {current_game}");
+                            let switched_game = past_game != current_game;
+                            skip_waiting = switched_game;
+                            switched_game
+                        });
+                    // println!("start: {start_of_session}, end: {end_of_session}");
 
                     if start_of_session {
                         start_time = Utc::now();
@@ -138,7 +146,10 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
             Err(e) => eprintln!("API request failed: {}", e),
         }
 
-        wait_x_seconds(&config.timezone, config.delay).await;
+        if !skip_waiting {
+            wait_x_seconds(&config.timezone, config.delay).await;
+            skip_waiting = true;
+        }
     }
 }
 
@@ -157,7 +168,7 @@ async fn main() -> std::io::Result<()> {
         timezone: Europe::Paris,
         calendar_path: "game_sessions.ics".to_string(),
         // TODO: feat - ask delay frequency
-        delay: 5 * 60,
+        delay: 1 * 30,
         // TODO: feat - ask one time for user credentials to connect to CalDAV
         caldav: match (
             env::var("CALDAV_PROVIDER").ok(),
@@ -213,6 +224,7 @@ async fn main() -> std::io::Result<()> {
 /*                                    Utils                                   */
 /* -------------------------------------------------------------------------- */
 
+/// TODO: random delay?
 async fn wait_x_seconds(timezone: &Tz, delay: u64) {
     let next_update = Utc::now() + Duration::seconds(delay as i64);
     println!(
