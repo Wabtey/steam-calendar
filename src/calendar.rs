@@ -62,14 +62,16 @@ pub async fn create_game_session_event(
 
     /* ----------------------------- push new event ----------------------------- */
     // TODO: feat - add presence of steam friend
+    let mut game_info_plus = game_info.to_string();
     let description = if achievements.is_empty() {
         "No achievements unlocked during this session".to_string()
     } else {
+        game_info_plus = format!("{game_info} * ({})", achievements.lines().count());
         format!("Achievements:\n{achievements}")
     };
 
     let event = Event::new()
-        .summary(game_info)
+        .summary(&game_info_plus)
         .description(&description)
         .starts(start_time)
         // .class(Class::Confidential)

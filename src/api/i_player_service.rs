@@ -30,7 +30,7 @@ pub struct Player {
     pub timecreated: Option<i64>,
     pub gameid: Option<String>,
     pub gameserverip: Option<String>,
-    // what we need
+    /// what we need
     pub gameextrainfo: Option<String>,
     pub loccountrycode: Option<String>,
     pub locstatecode: Option<String>,
