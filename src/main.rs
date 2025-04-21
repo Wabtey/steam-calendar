@@ -39,6 +39,7 @@ struct AppState {
 }
 
 // REFACTOR: write logs down
+// REFACTOR: release - handle all errors, do not crash
 
 /* -------------------------------------------------------------------------- */
 /*                                  Endpoints                                 */
@@ -84,6 +85,7 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
 
     loop {
         match reqwest::get(&player_summaries_url).await {
+            Err(e) => eprintln!("API request failed: {}", e),
             Ok(response) => {
                 if let Ok(player_summary) = response.json::<PlayerSummaryResponse>().await {
                     let player = &player_summary.response.players[0];
@@ -128,22 +130,18 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
                     /*                 Create the Event at the end of the session                 */
                     /* -------------------------------------------------------------------------- */
                     if let Some(game_info) = &currently_playing {
-                        if let Err(e) = create_game_session_event(
+                        let _event = create_game_session_event(
                             config.clone(),
                             &game_id,
                             game_info,
                             start_time,
                             end_time,
                         )
-                        .await
-                        {
-                            eprintln!("Error creating event: {}", e);
-                        }
+                        .await;
                     }
                     currently_playing = None; // = game_currently_played.clone();
                 }
             }
-            Err(e) => eprintln!("API request failed: {}", e),
         }
 
         if !skip_waiting {

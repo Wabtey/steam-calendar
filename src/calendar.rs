@@ -12,7 +12,7 @@ pub async fn create_game_session_event(
     game_info: &str,
     start_time: DateTime<Utc>,
     end_time: DateTime<Utc>,
-) -> Result<Event, Box<dyn Error>> {
+) -> Event {
     /* -------------------------- retrieve achievements ------------------------- */
     let achievements = get_session_achievement(
         config.clone(),
@@ -21,7 +21,7 @@ pub async fn create_game_session_event(
         start_time.timestamp(),
         end_time.timestamp(),
     )
-    .await?;
+    .await;
 
     println!(
         "{}: Stopped playing at {}{} (for {})",
@@ -37,8 +37,8 @@ pub async fn create_game_session_event(
         {
             let duration = end_time - start_time;
             let hours = duration.num_hours();
-            let minutes = duration.num_minutes() % 60; // NOTE: %60 needed?
-            let seconds = duration.num_seconds() % 60;
+            let minutes = duration.num_minutes(); // NOTE: %60 needed?
+            let seconds = duration.num_seconds();
 
             if hours > 0 {
                 format!("{}h {}m {}s", hours, minutes, seconds)
@@ -51,8 +51,9 @@ pub async fn create_game_session_event(
     );
     /* ---------------------------- retrieve calendar --------------------------- */
     let mut calendar = if Path::new(&config.calendar_path).exists() {
-        let calendar_data = fs::read_to_string(config.calendar_path.clone())?;
-        Calendar::from_str(&calendar_data)?
+        let calendar_data = fs::read_to_string(config.calendar_path.clone())
+            .unwrap_or("BEGIN:VCALENDAR\nEND:VCALENDAR".to_string());
+        Calendar::from_str(&calendar_data).unwrap_or_default()
     } else {
         Calendar::new()
             .name("Game Sessions")
@@ -88,9 +89,10 @@ pub async fn create_game_session_event(
     // local save
     calendar.push(event.clone());
 
-    fs::write(config.calendar_path, calendar.to_string())?;
+    fs::write(config.calendar_path, calendar.to_string())
+        .unwrap_or_else(|e| eprintln!("failed to write calendar: {e}"));
     // println!("{calendar}");
-    Ok(event)
+    event
 }
 
 /* ---------------------------------------------------------- */

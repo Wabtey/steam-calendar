@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use std::collections::HashMap;
 
 use crate::{
@@ -15,25 +16,29 @@ pub async fn get_session_achievement(
     game_name: &str,
     start_time: i64,
     end_time: i64,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> String {
     // println!("game id: {appid}");
     let achievements_url = format!(
         "https://api.steampowered.com/ISteamUserStats/GetPlayerAchievements/v1/?appid={}&key={}&steamid={}&l=english",
         appid, config.api_key, config.steam_id
     );
 
-    let achievements_response = reqwest::get(&achievements_url).await?;
-    let achievements: PlayerAchievementsResponse = match achievements_response.json().await {
-        Ok(data) => data,
+    let default_response = PlayerAchievementsResponse {
+        playerstats: PlayerStats {
+            steamID: config.steam_id.to_string(),
+            gameName: game_name.to_string(),
+            achievements: vec![],
+        },
+    };
+
+    let achievements: PlayerAchievementsResponse = match reqwest::get(&achievements_url).await {
+        Ok(achievements_response) => achievements_response.json().await.unwrap_or_else(|_| {
+            eprintln!("JSON parsing error");
+            default_response
+        }),
         Err(_) => {
-            println!("No achievements available for this game");
-            PlayerAchievementsResponse {
-                playerstats: PlayerStats {
-                    steamID: config.steam_id.to_string(),
-                    gameName: game_name.to_string(),
-                    achievements: vec![],
-                },
-            }
+            eprintln!("No achievements available for {game_name}");
+            default_response
         }
     };
 
@@ -79,7 +84,7 @@ pub async fn get_session_achievement(
         .collect::<Vec<_>>()
         .join("\n");
 
-    Ok(achievements)
+    achievements
 }
 
 pub async fn get_achievement_percentage(
