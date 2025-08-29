@@ -30,22 +30,22 @@ pub async fn create_game_session_event(
             .format("%H:%M:%S"),
         game_info,
         if achievements.is_empty() {
-            "".to_string()
+            String::new()
         } else {
             format!(", {} achievements unlocked", achievements.lines().count())
         },
         {
             let duration = end_time - start_time;
             let hours = duration.num_hours();
-            let minutes = duration.num_minutes(); // NOTE: %60 needed?
-            let seconds = duration.num_seconds();
+            let minutes = duration.num_minutes() % 60;
+            let seconds = duration.num_seconds() % 60;
 
             if hours > 0 {
-                format!("{}h {}m {}s", hours, minutes, seconds)
+                format!("{hours}h {minutes}m {seconds}s")
             } else if minutes > 0 {
-                format!("{}m {}s", minutes, seconds)
+                format!("{minutes}m {seconds}s")
             } else {
-                format!("{}s", seconds)
+                format!("{seconds}s")
             }
         }
     );
@@ -80,7 +80,7 @@ pub async fn create_game_session_event(
         .ends(end_time)
         .uid(&format!(
             "steam-{}-{}",
-            game_info.to_lowercase().replace(" ", "-"),
+            game_info.to_lowercase().replace(' ', "-"),
             start_time.timestamp()
         ))
         .done();
@@ -88,6 +88,17 @@ pub async fn create_game_session_event(
     // println!("{event:#?}");
     // local save
     calendar.push(event.clone());
+
+    // backup
+    fs::write(
+        format!(
+            "{}.{}.bak",
+            Utc::now().format("%Y%m%d_%H%M%S"),
+            config.calendar_path
+        ),
+        calendar.to_string(),
+    )
+    .unwrap_or_else(|e| eprintln!("failed to write backup calendar: {e}"));
 
     fs::write(config.calendar_path, calendar.to_string())
         .unwrap_or_else(|e| eprintln!("failed to write calendar: {e}"));
@@ -108,7 +119,7 @@ pub async fn publish_to_nextcloud(
 ) -> Result<(), Box<dyn Error>> {
     let uid = event.get_uid().ok_or("Event has no UID")?;
     let ical_data = event.to_string();
-    let url = format!("{}/{}.ics", provider, uid);
+    let url = format!("{provider}/{uid}.ics");
 
     let client = Client::new();
     let response = client

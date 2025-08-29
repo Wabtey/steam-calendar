@@ -31,16 +31,16 @@ pub async fn get_session_achievement(
         },
     };
 
-    let achievements: PlayerAchievementsResponse = match reqwest::get(&achievements_url).await {
-        Ok(achievements_response) => achievements_response.json().await.unwrap_or_else(|_| {
-            eprintln!("JSON parsing error");
-            default_response
-        }),
-        Err(_) => {
+    let achievements: PlayerAchievementsResponse =
+        if let Ok(achievements_response) = reqwest::get(&achievements_url).await {
+            achievements_response.json().await.unwrap_or_else(|_| {
+                eprintln!("JSON parsing error");
+                default_response
+            })
+        } else {
             eprintln!("No achievements available for {game_name}");
             default_response
-        }
-    };
+        };
 
     let filtered_achievements = achievements
         .playerstats
@@ -66,11 +66,11 @@ pub async fn get_session_achievement(
                     let description = a
                         .description
                         .clone()
-                        .unwrap_or(" - no description".to_string());
+                        .unwrap_or("no description".to_string());
                     if description.is_empty() {
-                        "no description".to_string()
+                        " - no description".to_string()
                     } else {
-                        description
+                        format!(" - {description}")
                     }
                 },
                 DateTime::from_timestamp(a.unlocktime, 0)

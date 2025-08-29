@@ -1,4 +1,6 @@
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, web};
+#![warn(clippy::pedantic)]
+
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, put, route, web};
 use calendar::create_game_session_event;
 use chrono::{DateTime, Duration, Utc};
 use chrono_tz::{Europe, Tz};
@@ -39,7 +41,6 @@ struct AppState {
 }
 
 // REFACTOR: write logs down
-// REFACTOR: release - handle all errors, do not crash
 
 /* -------------------------------------------------------------------------- */
 /*                                  Endpoints                                 */
@@ -88,6 +89,10 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
             Err(e) => eprintln!("API request failed: {}", e),
             Ok(response) => {
                 if let Ok(player_summary) = response.json::<PlayerSummaryResponse>().await {
+                    if player_summary.response.players.is_empty() {
+                        eprintln!("API request failed: No players returned.");
+                        continue;
+                    }
                     let player = &player_summary.response.players[0];
                     let game_currently_played = player.gameextrainfo.as_ref();
 
@@ -166,7 +171,7 @@ async fn main() -> std::io::Result<()> {
         timezone: Europe::Paris,
         calendar_path: "game_sessions.ics".to_string(),
         // TODO: feat - ask delay frequency
-        delay: 1 * 30,
+        delay: 60,
         // TODO: feat - ask one time for user credentials to connect to CalDAV
         caldav: match (
             env::var("CALDAV_PROVIDER").ok(),
