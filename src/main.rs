@@ -1,6 +1,6 @@
 #![warn(clippy::pedantic)]
 
-use actix_web::{App, HttpResponse, HttpServer, Responder, get, put, route, web};
+use actix_web::{App, HttpResponse, HttpServer, Responder, get, put, web};
 use calendar::create_game_session_event;
 use chrono::{DateTime, Duration, Utc};
 use chrono_tz::{Europe, Tz};
@@ -67,6 +67,60 @@ async fn ics_endpoint(data: web::Data<Arc<AppState>>) -> impl Responder {
         .body(ics_content)
 }
 
+#[put("/calendar.ics")]
+async fn write_ics_endpoint(data: web::Data<Arc<AppState>>, body: web::Bytes) -> impl Responder {
+    let config = &data.config;
+
+    /* --------------------------------- backup --------------------------------- */
+    if Path::new(&config.calendar_path).exists() {
+        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+        let backup_path = format!("{}.{}.bak", config.calendar_path, timestamp);
+        if let Err(e) = fs::copy(&config.calendar_path, &backup_path) {
+            eprintln!("Failed to create backup: {e}");
+            return HttpResponse::InternalServerError().finish();
+        }
+    }
+
+    /* ---------------------------- incoming calendar --------------------------- */
+    let incoming_cal = match String::from_utf8(body.to_vec()) {
+        Ok(s) => match Calendar::from_str(&s) {
+            Ok(cal) => cal,
+            Err(_) => return HttpResponse::BadRequest().body("Invalid calendar format"),
+        },
+        Err(_) => return HttpResponse::BadRequest().body("Invalid UTF-8"),
+    };
+
+    /* ---------------------------- existing calendar --------------------------- */
+    let existing_cal = if Path::new(&config.calendar_path).exists() {
+        match fs::read_to_string(&config.calendar_path) {
+            Ok(data) => Calendar::from_str(&data).unwrap_or_else(|_| Calendar::new().done()),
+            Err(_) => Calendar::new().done(),
+        }
+    } else {
+        Calendar::new().done()
+    };
+
+    /* ---------------------------------- merge --------------------------------- */
+    let mut merged_cal = Calendar::new();
+    for component in existing_cal.components {
+        merged_cal.push(component);
+    }
+    for component in incoming_cal.components {
+        merged_cal.push(component);
+    }
+    let merged_cal = merged_cal.done();
+
+    /* ---------------------------------- save ---------------------------------- */
+    if let Err(e) = fs::write(&config.calendar_path, merged_cal.to_string()) {
+        eprintln!("Failed to write calendar: {e}");
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    HttpResponse::Ok()
+        .content_type("text/calendar; charset=utf-8")
+        .body(merged_cal.to_string())
+}
+
 /* -------------------------------------------------------------------------- */
 /*                                  Services                                  */
 /* -------------------------------------------------------------------------- */
@@ -86,7 +140,7 @@ async fn steam_tracking_loop(app_state: Arc<AppState>) {
 
     loop {
         match reqwest::get(&player_summaries_url).await {
-            Err(e) => eprintln!("API request failed: {}", e),
+            Err(e) => eprintln!("API request failed: {e}"),
             Ok(response) => {
                 if let Ok(player_summary) = response.json::<PlayerSummaryResponse>().await {
                     if player_summary.response.players.is_empty() {
@@ -173,22 +227,21 @@ async fn main() -> std::io::Result<()> {
         // TODO: feat - ask delay frequency
         delay: 60,
         // TODO: feat - ask one time for user credentials to connect to CalDAV
-        caldav: match (
+        caldav: if let (Some(p), Some(u), Some(pw)) = (
             env::var("CALDAV_PROVIDER").ok(),
             env::var("CALDAV_USERNAME").ok(),
             env::var("CALDAV_PASSWORD").ok(),
         ) {
-            (Some(p), Some(u), Some(pw)) => Some(CalDAV {
+            Some(CalDAV {
                 provider: p,
                 username: u,
                 password: pw,
-            }),
-            _ => {
-                println!(
-                    "CalDAV credentials incomplete, publishing disabled (missing either in the .env the provider, username or password)"
-                );
-                None
-            }
+            })
+        } else {
+            println!(
+                "CalDAV credentials incomplete, publishing disabled (missing either in the .env the provider, username or password)"
+            );
+            None
         },
     };
 
@@ -217,6 +270,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(app_state.clone()))
             .service(ics_endpoint)
+            .service(write_ics_endpoint)
     })
     .bind(("0.0.0.0", 8080))?
     .run()
