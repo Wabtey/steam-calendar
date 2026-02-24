@@ -3,6 +3,17 @@
 <!-- DOC: License it -->
 <!-- DOC: Code coverage -->
 
+<!-- REFACTOR: when we get the not connected error `API request failed: error sending request for url (https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v0002/?key=XXXXXX&steamids=XXXXXX)`, stop and wait -->
+
+If you're an addict to keep everything saved, especially your actions,
+this program monitors your steam account online and create event in a local calendar each time you play steam games.
+
+> [!NOTE]
+> You have to start the program for it to start monitor your game sessions.
+> It creates the event when you close the game, adding all achievement you obtained during your session.
+>
+> It is not retroactive.
+
 ## Quickstart
 
 - create the `.env` file at the root of the project and include your [steam api key](https://steamcommunity.com/dev/apikey)
@@ -16,24 +27,291 @@
   CALDAV_PASSWORD="password"
   ```
 
+- `mkdir game_sessions/` (or setup another location)
 - `cargo run` locally run your server and query steam api
 - `ngrok http http://localhost:8080` to publish your local server using ngrok
 - append `/calendar.ics` to your ngrok url and use it do have a dynamic (change with the server) read only calendar
+  - `http://localhost:8080/calendar.ics` returns the last read only version of the calendar
 
 ## Event Format
+
+<details>
+  <summary>Just one event with one achievement</summary>
 
 ```ics
 BEGIN:VCALENDAR
 BEGIN:VEVENT
-DTSTAMP:20250415T002909Z
 CLASS:CONFIDENTIAL
-DESCRIPTION:Achievements:\n- 1% Finish the base game
-DTEND:20250415T004909Z
-DTSTART:20250415T002909Z
-SUMMARY:Vampire Survivors
-UID:steam-vampire-survivors-1744676949
+DESCRIPTION:Achievements:\n- XIX - Heart of Fire: 22.9% - Reach Level 50
+ with Arca. (2025-06-15 18:35:24)
+DTEND:20250615T163847Z
+DTSTAMP:20250615T163849Z
+DTSTART:20250615T160635Z
+STATUS:CONFIRMED
+SUMMARY:Vampire Survivors * (1)
+UID:steam-vampire-survivors-1750003595
 END:VEVENT
 END:VCALENDAR
 ```
+
+</details>
+
+<details>
+  <summary>A full example of the Silksong release: `2025-09-15` to `2025-09-21`</summary>
+  
+  Import this calendar example to see how it could be in your calendar app.
+  
+```ics
+VERSION:2.0
+PRODID:ICALENDAR-RS
+CALSCALE:GREGORIAN
+BEGIN:VTIMEZONE
+DTSTAMP:20250417T140230Z
+TZID:Europe/Paris
+UID:5537d040-cf63-49c8-a08c-ce6dca6e4a2a
+BEGIN:DAYLIGHT
+DTSTAMP:20250417T140230Z
+DTSTART:19700329T020000
+RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=-1SU
+TZNAME:CEST
+TZOFFSETFROM:+0100
+TZOFFSETTO:+0200
+UID:cc68fb33-18ce-4016-a1b8-1cbd779d3771
+END:DAYLIGHT
+BEGIN:STANDARD
+DTSTAMP:20250417T140230Z
+DTSTART:19701025T030000
+RRULE:FREQ=YEARLY;BYMONTH=10;BYDAY=-1SU
+TZNAME:CET
+TZOFFSETFROM:+0200
+TZOFFSETTO:+0100
+UID:1bfa0ce2-f886-4373-8280-0f0c60f90dd5
+END:STANDARD
+END:VTIMEZONE
+
+
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250915T123652Z
+DTSTAMP:20250915T123652Z
+DTSTART:20250915T113025Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1757935825
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250915T152147Z
+DTSTAMP:20250915T152147Z
+DTSTART:20250915T133409Z
+STATUS:CONFIRMED
+SUMMARY:Deep Rock Galactic
+UID:steam-deep-rock-galactic-1757943249
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250915T185752Z
+DTSTAMP:20250915T185752Z
+DTSTART:20250915T152649Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight
+UID:steam-hollow-knight-1757950009
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250915T200312Z
+DTSTAMP:20250915T200312Z
+DTSTART:20250915T194607Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight
+UID:steam-hollow-knight-1757965567
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Brotherhood: 15.7% - no description (2025-09-1
+ 6 00:13:18)\n- Inspiration: 14.8% - no description (2025-09-16 00:47:20)
+DTEND:20250915T231410Z
+DTSTAMP:20250915T231411Z
+DTSTART:20250915T214243Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight * (2)
+UID:steam-hollow-knight-1757972563
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Masked: 18.7% - Acquire all Mask Shards (2025-
+ 09-16 01:17:22)\n- Dark Romance: 20.2% - no description (2025-09-16 01:35:
+ 31)
+DTEND:20250916T010846Z
+DTSTAMP:20250916T010846Z
+DTSTART:20250915T231512Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight * (2)
+UID:steam-hollow-knight-1757978112
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250916T144057Z
+DTSTAMP:20250916T144058Z
+DTSTART:20250916T135946Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758031186
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250916T222214Z
+DTSTAMP:20250916T222215Z
+DTSTART:20250916T202039Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758054039
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Grey Ghost: 26.0% - no description (2025-09-1
+ 7 01:29:13)
+DTEND:20250917T004307Z
+DTSTAMP:20250917T004307Z
+DTSTART:20250916T222817Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (1)
+UID:steam-hollow-knight:-silksong-1758061697
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250917T013622Z
+DTSTAMP:20250917T013623Z
+DTSTART:20250917T004307Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight
+UID:steam-hollow-knight-1758069787
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250917T163153Z
+DTSTAMP:20250917T163153Z
+DTSTART:20250917T145816Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758121096
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250917T172110Z
+DTSTAMP:20250917T172110Z
+DTSTART:20250917T163756Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758127076
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Regenerated: 13.0% - Acquire all Silk Hearts (
+ 2025-09-18 01:43:33)
+DTEND:20250917T235154Z
+DTSTAMP:20250917T235155Z
+DTSTART:20250917T212510Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (1)
+UID:steam-hollow-knight:-silksong-1758144310
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250918T151923Z
+DTSTAMP:20250918T151924Z
+DTSTART:20250918T132748Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758202068
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250918T182721Z
+DTSTAMP:20250918T182722Z
+DTSTART:20250918T160037Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758211237
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Bonded: 16.0% - no description (2025-09-19 03:
+ 17:09)\n- Glutton: 22.4% - Satiate the Grand Gourmand (2025-09-19 02:22:15
+ )\n- Trail's End: 20.6% - Grant Shakra's wish (2025-09-19 02:03:25)\n- Sna
+ red Silk: 16.4% - no description (2025-09-19 02:52:12)
+DTEND:20250919T034614Z
+DTSTAMP:20250919T034615Z
+DTSTART:20250918T203159Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (4)
+UID:steam-hollow-knight:-silksong-1758227519
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250919T043228Z
+DTSTAMP:20250919T043228Z
+DTSTART:20250919T042225Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758255745
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Seed: 11.5% - no description (2025-09-19 17:39
+ :06)
+DTEND:20250919T155046Z
+DTSTAMP:20250919T155047Z
+DTSTART:20250919T144526Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (1)
+UID:steam-hollow-knight:-silksong-1758293126
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Tyrant: 12.1% - no description (2025-09-19 18:
+ 54:11)
+DTEND:20250919T165707Z
+DTSTAMP:20250919T165708Z
+DTSTART:20250919T163400Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (1)
+UID:steam-hollow-knight:-silksong-1758299640
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Grand Performance: 24.8% - no description (202
+ 5-09-19 19:10:40)
+DTEND:20250919T195806Z
+DTSTAMP:20250919T195807Z
+DTSTART:20250919T165808Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight * (1)
+UID:steam-hollow-knight-1758301088
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250919T220445Z
+DTSTAMP:20250919T220445Z
+DTSTART:20250919T210026Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758315626
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:Achievements:\n- Diva: 11.3% - no description (2025-09-20 00:14
+ :58)\n- Fatal Resolve: 11.7% - no description (2025-09-20 01:32:55)\n- Rem
+ embrance: 10.6% - no description (2025-09-20 00:54:27)
+DTEND:20250920T002025Z
+DTSTAMP:20250920T002026Z
+DTSTART:20250919T220546Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong * (3)
+UID:steam-hollow-knight:-silksong-1758319546
+END:VEVENT
+BEGIN:VEVENT
+DESCRIPTION:No achievements unlocked during this session
+DTEND:20250921T125215Z
+DTSTAMP:20250921T125215Z
+DTSTART:20250921T123209Z
+STATUS:CONFIRMED
+SUMMARY:Hollow Knight: Silksong
+UID:steam-hollow-knight:-silksong-1758457929
+END:VEVENT
+```
+
+</details>
 
 <!-- DOC: add to the repo an example of .ics generated -->

@@ -125,6 +125,16 @@ async fn write_ics_endpoint(data: web::Data<Arc<AppState>>, body: web::Bytes) ->
 /*                                  Services                                  */
 /* -------------------------------------------------------------------------- */
 
+/// ## Notes
+///
+/// FIXME: bad api response and crash rarely... (line 150: `let player = &player_summary.response.players[0];`)
+///
+/// ```text
+/// Next update: 23:31:13
+/// thread 'main' panicked at src/main.rs:190:66:
+/// index out of bounds: the len is 0 but the index is 0
+/// note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/// ```
 async fn steam_tracking_loop(app_state: Arc<AppState>) {
     let config = &app_state.config;
     let player_summaries_url = format!(
@@ -223,7 +233,8 @@ async fn main() -> std::io::Result<()> {
         steam_id: env::var("STEAM_USER_ID").expect("STEAM_USER_ID missing"),
         // TODO: feat - ask for/detect timezone
         timezone: Europe::Paris,
-        calendar_path: "game_sessions.ics".to_string(),
+        // TODO: feat - ask for the location (and create it)
+        calendar_path: "game_sessions/game_sessions.ics".to_string(),
         // TODO: feat - ask delay frequency
         delay: 60,
         // TODO: feat - ask one time for user credentials to connect to CalDAV

@@ -4,3 +4,6 @@ Cargo.lock
 
 # secrets
 .env
+
+# local calendars
+game_sessions/

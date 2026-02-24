@@ -86,16 +86,13 @@ pub async fn create_game_session_event(
         .done();
 
     // println!("{event:#?}");
+
     // local save
     calendar.push(event.clone());
 
     // backup
     fs::write(
-        format!(
-            "{}.{}.bak",
-            Utc::now().format("%Y%m%d_%H%M%S"),
-            config.calendar_path
-        ),
+        backup_path(&config.calendar_path, &Utc::now().format("%Y%m%d_%H%M%S").to_string()).unwrap_or_else(|e| format!("Failed to set up a correct backup path: {e}")),
         calendar.to_string(),
     )
     .unwrap_or_else(|e| eprintln!("failed to write backup calendar: {e}"));
@@ -139,5 +136,80 @@ pub async fn publish_to_nextcloud(
             response.text().await?
         )
         .into())
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*                           Utils                            */
+/* ---------------------------------------------------------- */
+
+/// Returns the correct backup path.
+///
+/// The format, for a date `utc` = `"19700101_000101"` and
+/// for a calendar_path including a parent directory as `"parent_dir/calendar.ics"`
+/// it creates `"parent_dir/19700101_000101.calendar.ics.bak"`.
+///
+/// For a calendar_path with only a file stem as `"calendar.ics"` it creates
+/// `"19700101_000101.calendar.ics.bak"`.
+///
+/// ## Notes
+///
+/// NOTE: this path doesn't work on Windows - replace / by \
+fn backup_path(calendar_path: &str, utc: &str) -> Result<String, Box<dyn Error>> {
+    let path = Path::new(calendar_path);
+    let parent = path.parent();
+    let file_stem = path.file_stem();
+    let ext = path.extension();
+
+    match (parent, file_stem, ext) {
+        (Some(parent), Some(file_stem), Some(ext)) => {
+            let parent = parent.to_str().unwrap_or(".");
+            let backup_path = if parent.is_empty() {
+                format!("{utc}.{calendar_path}.bak")
+            } else {
+                format!(
+                    "{}/{}.{}.{}.bak",
+                    parent,
+                    utc,
+                    file_stem.to_str().unwrap_or("NO_FILE_STEM"),
+                    ext.to_str().unwrap_or("UNKNOWN_EXTENSION"),
+                )
+            };
+
+            Ok(backup_path)
+        }
+
+        (_, _, _) => Err(format!(
+            "Failed to create a correct backup_path: calendar_path: {calendar_path}" // parent: {parent} file_stem: {file_stem} ext: {ext}
+        )
+        .into()),
+    }
+}
+
+/* ---------------------------------------------------------- */
+/*                           Tests                            */
+/* ---------------------------------------------------------- */
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backup_path_well_formed() {
+        let calendar_short_path = "calendar.ics";
+        let date = &DateTime::from_timestamp(61, 0).unwrap().format("%Y%m%d_%H%M%S").to_string();
+
+        let backup_short_path = backup_path(calendar_short_path, date);
+        assert!(backup_short_path.is_ok());
+        assert_eq!(backup_short_path.unwrap(), "19700101_000101.calendar.ics.bak");
+
+        let calendar_long_path = "parent_dir/calendar.ics";
+
+        let backup_long_path = backup_path(calendar_long_path, date);
+        assert!(backup_long_path.is_ok());
+        assert_eq!(
+            backup_long_path.unwrap(),
+            "parent_dir/19700101_000101.calendar.ics.bak"
+        );
     }
 }

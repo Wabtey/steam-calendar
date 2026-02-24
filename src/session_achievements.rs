@@ -98,7 +98,7 @@ pub async fn get_achievement_percentage(
     );
 
     let achievements_response = reqwest::get(&achievements_url).await;
-    let percentage = match achievements_response {
+    match achievements_response {
         Err(e) => {
             eprintln!("{e}");
             "101.".to_string()
@@ -128,7 +128,5 @@ pub async fn get_achievement_percentage(
                     "101.".to_string()
                 })
         }
-    };
-
-    percentage
+    }
 }
